@@ -35,9 +35,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSession(session);
         setUser(session?.user ?? null);
         
-        // If user just signed up, create their user record
-        if (event === 'SIGNED_UP' && session?.user) {
-          await createUserRecord(session.user);
+        // If user has a session, check if they need a user record created
+        if (session?.user) {
+          await createUserRecordIfNeeded(session.user);
         }
         
         setLoading(false);
@@ -54,9 +54,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => subscription.unsubscribe();
   }, []);
 
-  const createUserRecord = async (authUser: User) => {
+  const createUserRecordIfNeeded = async (authUser: User) => {
     try {
-      console.log('Creating user record for:', authUser.id);
+      console.log('Checking user record for:', authUser.id);
       
       // Check if user already exists
       const { data: existingUser } = await supabase
@@ -66,6 +66,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .maybeSingle();
 
       if (!existingUser) {
+        console.log('Creating new user record for:', authUser.id);
         // Generate referral code
         const referralCode = 'CFC' + Math.random().toString(36).substring(2, 8).toUpperCase();
         
@@ -95,7 +96,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
     } catch (error) {
-      console.error('Error in createUserRecord:', error);
+      console.error('Error in createUserRecordIfNeeded:', error);
     }
   };
 
