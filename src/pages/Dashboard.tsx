@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -66,23 +65,81 @@ const Dashboard = () => {
 
   const fetchUserData = async () => {
     try {
+      console.log('Fetching user data for:', user?.id);
+      
       const { data, error } = await supabase
         .from('users')
         .select('*')
         .eq('id', user?.id)
-        .single();
+        .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+
+      if (!data) {
+        console.log('No user data found, creating user record...');
+        // Create user record if it doesn't exist
+        await createUserRecord();
+        return;
+      }
+
+      console.log('User data fetched:', data);
       setUserData(data);
     } catch (error) {
       console.error('Error fetching user data:', error);
       toast({
         title: "Error",
-        description: "Failed to load user data",
+        description: "Failed to load user data. Please try refreshing the page.",
         variant: "destructive",
       });
     } finally {
       setLoadingData(false);
+    }
+  };
+
+  const createUserRecord = async () => {
+    try {
+      if (!user) return;
+      
+      const referralCode = 'CFC' + Math.random().toString(36).substring(2, 8).toUpperCase();
+      
+      const { data, error } = await supabase
+        .from('users')
+        .insert({
+          id: user.id,
+          name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+          email: user.email || '',
+          mobile: user.user_metadata?.phone || '',
+          password_hash: '',
+          aadhaar_number: '',
+          pan_number: '',
+          aadhaar_image_path: '',
+          pan_image_path: '',
+          referral_code: referralCode,
+          balance: 0,
+          referral_bonus: 0,
+          can_withdraw: false,
+          kyc_status: 'pending'
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setUserData(data);
+      toast({
+        title: "Welcome!",
+        description: "Your account has been set up successfully.",
+      });
+    } catch (error) {
+      console.error('Error creating user record:', error);
+      toast({
+        title: "Error",
+        description: "Failed to set up your account. Please contact support.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -128,8 +185,8 @@ const Dashboard = () => {
         <Header />
         <div className="container mx-auto px-4 py-20">
           <div className="text-center">
-            <h1 className="text-2xl font-bold mb-4">Error Loading Dashboard</h1>
-            <p className="text-gray-600 mb-4">Unable to load your dashboard data.</p>
+            <h1 className="text-2xl font-bold mb-4">Setting up your account...</h1>
+            <p className="text-gray-600 mb-4">Please wait while we prepare your dashboard.</p>
             <Button onClick={() => window.location.reload()}>Reload Page</Button>
           </div>
         </div>

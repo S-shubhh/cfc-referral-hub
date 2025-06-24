@@ -12,6 +12,7 @@ import HowItWorks from "./pages/HowItWorks";
 import Subscribe from "./pages/Subscribe";
 import Dashboard from "./pages/Dashboard";
 import Wallet from "./pages/Wallet";
+import Payment from "./pages/Payment";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,6 +32,7 @@ const App = () => (
             <Route path="/subscribe" element={<Subscribe />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/wallet" element={<Wallet />} />
+            <Route path="/payment" element={<Payment />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

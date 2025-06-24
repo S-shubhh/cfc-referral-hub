@@ -77,14 +77,28 @@ const Wallet = () => {
 
   const fetchWalletData = async () => {
     try {
+      console.log('Fetching wallet data for:', user?.id);
+      
       // Fetch user data
       const { data: userRes, error: userError } = await supabase
         .from('users')
         .select('id, balance, can_withdraw')
         .eq('id', user?.id)
-        .single();
+        .maybeSingle();
 
       if (userError) throw userError;
+      
+      if (!userRes) {
+        console.log('No user data found in wallet');
+        toast({
+          title: "Account Setup Required",
+          description: "Please complete your account setup first.",
+          variant: "destructive",
+        });
+        navigate('/dashboard');
+        return;
+      }
+      
       setUserData(userRes);
 
       // Fetch transactions
@@ -111,7 +125,7 @@ const Wallet = () => {
       console.error('Error fetching wallet data:', error);
       toast({
         title: "Error",
-        description: "Failed to load wallet data",
+        description: "Failed to load wallet data. Please try refreshing the page.",
         variant: "destructive",
       });
     } finally {
@@ -221,9 +235,9 @@ const Wallet = () => {
         <Header />
         <div className="container mx-auto px-4 py-20">
           <div className="text-center">
-            <h1 className="text-2xl font-bold mb-4">Error Loading Wallet</h1>
-            <p className="text-gray-600 mb-4">Unable to load your wallet data.</p>
-            <Button onClick={() => window.location.reload()}>Reload Page</Button>
+            <h1 className="text-2xl font-bold mb-4">Account Setup Required</h1>
+            <p className="text-gray-600 mb-4">Please complete your account setup to access your wallet.</p>
+            <Button onClick={() => navigate('/dashboard')}>Go to Dashboard</Button>
           </div>
         </div>
         <Footer />

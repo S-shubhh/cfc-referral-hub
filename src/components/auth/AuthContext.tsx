@@ -30,9 +30,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.id);
         setSession(session);
         setUser(session?.user ?? null);
+        
+        // If user just signed up, create their user record
+        if (event === 'SIGNED_UP' && session?.user) {
+          await createUserRecord(session.user);
+        }
+        
         setLoading(false);
       }
     );
@@ -47,12 +54,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => subscription.unsubscribe();
   }, []);
 
+  const createUserRecord = async (authUser: User) => {
+    try {
+      console.log('Creating user record for:', authUser.id);
+      
+      // Check if user already exists
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', authUser.id)
+        .maybeSingle();
+
+      if (!existingUser) {
+        // Generate referral code
+        const referralCode = 'CFC' + Math.random().toString(36).substring(2, 8).toUpperCase();
+        
+        const { error } = await supabase
+          .from('users')
+          .insert({
+            id: authUser.id,
+            name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'User',
+            email: authUser.email || '',
+            mobile: authUser.user_metadata?.phone || '',
+            password_hash: '',
+            aadhaar_number: '',
+            pan_number: '',
+            aadhaar_image_path: '',
+            pan_image_path: '',
+            referral_code: referralCode,
+            balance: 0,
+            referral_bonus: 0,
+            can_withdraw: false,
+            kyc_status: 'pending'
+          });
+
+        if (error) {
+          console.error('Error creating user record:', error);
+        } else {
+          console.log('User record created successfully');
+        }
+      }
+    } catch (error) {
+      console.error('Error in createUserRecord:', error);
+    }
+  };
+
   const signUp = async (email: string, password: string, userData: any) => {
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/`,
         data: userData
       }
     });
