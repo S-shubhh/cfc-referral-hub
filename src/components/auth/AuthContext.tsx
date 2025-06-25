@@ -28,6 +28,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('Setting up auth state listener');
+    
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -35,8 +37,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSession(session);
         setUser(session?.user ?? null);
         
-        // If user has a session, check if they need a user record created
-        if (session?.user) {
+        // If user has a session, ensure they have a user record
+        if (session?.user && event === 'SIGNED_IN') {
           await createUserRecordIfNeeded(session.user);
         }
         
@@ -46,9 +48,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session check:', session?.user?.id);
       setSession(session);
       setUser(session?.user ?? null);
-      setLoading(false);
+      
+      // If there's an existing session, ensure user record exists
+      if (session?.user) {
+        createUserRecordIfNeeded(session.user).then(() => {
+          setLoading(false);
+        });
+      } else {
+        setLoading(false);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -58,26 +69,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('Checking user record for:', authUser.id);
       
-      // Check if user already exists
-      const { data: existingUser } = await supabase
+      // First check if user already exists
+      const { data: existingUser, error: checkError } = await supabase
         .from('users')
         .select('id')
         .eq('id', authUser.id)
         .maybeSingle();
 
+      if (checkError) {
+        console.error('Error checking user record:', checkError);
+        return;
+      }
+
       if (!existingUser) {
         console.log('Creating new user record for:', authUser.id);
+        
         // Generate referral code
         const referralCode = 'CFC' + Math.random().toString(36).substring(2, 8).toUpperCase();
         
-        const { error } = await supabase
+        // Use upsert to handle potential race conditions
+        const { error: insertError } = await supabase
           .from('users')
-          .insert({
+          .upsert({
             id: authUser.id,
             name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'User',
             email: authUser.email || '',
             mobile: authUser.user_metadata?.phone || '',
-            password_hash: '',
+            password_hash: '', // Not needed for Supabase Auth users
             aadhaar_number: '',
             pan_number: '',
             aadhaar_image_path: '',
@@ -87,13 +105,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             referral_bonus: 0,
             can_withdraw: false,
             kyc_status: 'pending'
+          }, { 
+            onConflict: 'id',
+            ignoreDuplicates: true 
           });
 
-        if (error) {
-          console.error('Error creating user record:', error);
+        if (insertError) {
+          console.error('Error creating user record:', insertError);
         } else {
           console.log('User record created successfully');
         }
+      } else {
+        console.log('User record already exists');
       }
     } catch (error) {
       console.error('Error in createUserRecordIfNeeded:', error);
@@ -101,6 +124,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signUp = async (email: string, password: string, userData: any) => {
+    console.log('Signing up user:', email);
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -112,6 +136,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signIn = async (email: string, password: string) => {
+    console.log('Signing in user:', email);
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password
@@ -120,6 +145,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    console.log('Signing out user');
     await supabase.auth.signOut();
   };
 

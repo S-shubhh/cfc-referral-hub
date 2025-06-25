@@ -17,7 +17,8 @@ import {
   Clock, 
   CheckCircle, 
   XCircle,
-  CreditCard
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 
 interface UserData {
@@ -45,7 +46,7 @@ interface Withdrawal {
 }
 
 const Wallet = () => {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -53,6 +54,7 @@ const Wallet = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [loadingData, setLoadingData] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   // Withdrawal form state
   const [showWithdrawForm, setShowWithdrawForm] = useState(false);
@@ -64,39 +66,38 @@ const Wallet = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!authLoading && !user) {
       navigate('/auth');
     }
-  }, [user, loading, navigate]);
+  }, [user, authLoading, navigate]);
 
   useEffect(() => {
-    if (user) {
+    if (user && !authLoading) {
       fetchWalletData();
     }
-  }, [user]);
+  }, [user, authLoading]);
 
   const fetchWalletData = async () => {
+    if (!user) return;
+    
     try {
-      console.log('Fetching wallet data for:', user?.id);
+      console.log('Fetching wallet data for:', user.id);
+      setError(null);
+      
+      // Add delay to ensure user record exists
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Fetch user data
       const { data: userRes, error: userError } = await supabase
         .from('users')
         .select('id, balance, can_withdraw')
-        .eq('id', user?.id)
+        .eq('id', user.id)
         .maybeSingle();
 
       if (userError) throw userError;
       
       if (!userRes) {
-        console.log('No user data found in wallet');
-        toast({
-          title: "Account Setup Required",
-          description: "Please complete your account setup first.",
-          variant: "destructive",
-        });
-        navigate('/dashboard');
-        return;
+        throw new Error('User data not found. Please go to dashboard first.');
       }
       
       setUserData(userRes);
@@ -105,7 +106,7 @@ const Wallet = () => {
       const { data: transactionsRes, error: transError } = await supabase
         .from('transactions')
         .select('*')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (transError) throw transError;
@@ -115,22 +116,28 @@ const Wallet = () => {
       const { data: withdrawalsRes, error: withdrawError } = await supabase
         .from('withdrawals')
         .select('*')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (withdrawError) throw withdrawError;
       setWithdrawals(withdrawalsRes || []);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching wallet data:', error);
+      setError(error.message);
       toast({
         title: "Error",
-        description: "Failed to load wallet data. Please try refreshing the page.",
+        description: error.message || "Failed to load wallet data",
         variant: "destructive",
       });
     } finally {
       setLoadingData(false);
     }
+  };
+
+  const handleRetry = () => {
+    setLoadingData(true);
+    fetchWalletData();
   };
 
   const handleWithdrawSubmit = async (e: React.FormEvent) => {
@@ -180,7 +187,7 @@ const Wallet = () => {
       // Refresh data
       fetchWalletData();
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error submitting withdrawal:', error);
       toast({
         title: "Error",
@@ -218,26 +225,39 @@ const Wallet = () => {
     }
   };
 
-  if (loading || loadingData) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-4"></div>
-          <p>Loading wallet...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!userData) {
+  if (authLoading || loadingData) {
     return (
       <div className="min-h-screen">
         <Header />
         <div className="container mx-auto px-4 py-20">
           <div className="text-center">
-            <h1 className="text-2xl font-bold mb-4">Account Setup Required</h1>
-            <p className="text-gray-600 mb-4">Please complete your account setup to access your wallet.</p>
-            <Button onClick={() => navigate('/dashboard')}>Go to Dashboard</Button>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-4"></div>
+            <p>Loading wallet...</p>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (error || !userData) {
+    return (
+      <div className="min-h-screen">
+        <Header />
+        <div className="container mx-auto px-4 py-20">
+          <div className="text-center">
+            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <h1 className="text-2xl font-bold mb-4">Unable to Load Wallet</h1>
+            <p className="text-gray-600 mb-6">{error || 'Something went wrong'}</p>
+            <div className="space-x-4">
+              <Button onClick={handleRetry} className="bg-orange-500 hover:bg-orange-600">
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Try Again
+              </Button>
+              <Button variant="outline" onClick={() => navigate('/dashboard')}>
+                Go to Dashboard
+              </Button>
+            </div>
           </div>
         </div>
         <Footer />

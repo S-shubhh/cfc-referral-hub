@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -19,7 +20,8 @@ import {
   AlertCircle,
   Upload,
   IndianRupee,
-  CreditCard
+  CreditCard,
+  RefreshCw
 } from 'lucide-react';
 
 interface UserData {
@@ -43,35 +45,42 @@ interface ReferralData {
 }
 
 const Dashboard = () => {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   
   const [userData, setUserData] = useState<UserData | null>(null);
   const [referrals, setReferrals] = useState<ReferralData[]>([]);
   const [loadingData, setLoadingData] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!authLoading && !user) {
       navigate('/auth');
     }
-  }, [user, loading, navigate]);
+  }, [user, authLoading, navigate]);
 
   useEffect(() => {
-    if (user) {
+    if (user && !authLoading) {
       fetchUserData();
-      fetchReferrals();
     }
-  }, [user]);
+  }, [user, authLoading, retryCount]);
 
   const fetchUserData = async () => {
+    if (!user) return;
+    
     try {
-      console.log('Fetching user data for:', user?.id);
+      console.log('Fetching user data for:', user.id);
+      setError(null);
+      
+      // Add a small delay to ensure user record creation is complete
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       const { data, error } = await supabase
         .from('users')
         .select('*')
-        .eq('id', user?.id)
+        .eq('id', user.id)
         .maybeSingle();
 
       if (error) {
@@ -80,15 +89,22 @@ const Dashboard = () => {
       }
 
       if (!data) {
-        console.log('No user data found');
-        // User record will be created by AuthContext
-        return;
+        console.log('No user data found, will retry...');
+        if (retryCount < 3) {
+          setRetryCount(prev => prev + 1);
+          return;
+        } else {
+          throw new Error('User record not found after multiple attempts');
+        }
       }
 
-      console.log('User data fetched:', data);
+      console.log('User data fetched successfully:', data);
       setUserData(data);
-    } catch (error) {
+      await fetchReferrals();
+      
+    } catch (error: any) {
       console.error('Error fetching user data:', error);
+      setError(error.message || 'Failed to load user data');
       toast({
         title: "Error",
         description: "Failed to load user data. Please try refreshing the page.",
@@ -100,11 +116,13 @@ const Dashboard = () => {
   };
 
   const fetchReferrals = async () => {
+    if (!user) return;
+    
     try {
       const { data, error } = await supabase
         .from('referrals')
         .select('*')
-        .eq('referrer_id', user?.id)
+        .eq('referrer_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -112,6 +130,12 @@ const Dashboard = () => {
     } catch (error) {
       console.error('Error fetching referrals:', error);
     }
+  };
+
+  const handleRetry = () => {
+    setLoadingData(true);
+    setRetryCount(0);
+    fetchUserData();
   };
 
   const copyReferralCode = () => {
@@ -135,26 +159,39 @@ const Dashboard = () => {
     }
   };
 
-  if (loading || loadingData) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-4"></div>
-          <p>Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!userData) {
+  if (authLoading || loadingData) {
     return (
       <div className="min-h-screen">
         <Header />
         <div className="container mx-auto px-4 py-20">
           <div className="text-center">
-            <h1 className="text-2xl font-bold mb-4">Setting up your account...</h1>
-            <p className="text-gray-600 mb-4">Please wait while we prepare your dashboard.</p>
-            <Button onClick={() => window.location.reload()}>Reload Page</Button>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-4"></div>
+            <p>Loading your dashboard...</p>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (error || !userData) {
+    return (
+      <div className="min-h-screen">
+        <Header />
+        <div className="container mx-auto px-4 py-20">
+          <div className="text-center">
+            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <h1 className="text-2xl font-bold mb-4">Unable to Load Dashboard</h1>
+            <p className="text-gray-600 mb-6">{error || 'Something went wrong'}</p>
+            <div className="space-x-4">
+              <Button onClick={handleRetry} className="bg-orange-500 hover:bg-orange-600">
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Try Again
+              </Button>
+              <Button variant="outline" onClick={() => navigate('/auth')}>
+                Back to Login
+              </Button>
+            </div>
           </div>
         </div>
         <Footer />
@@ -232,7 +269,7 @@ const Dashboard = () => {
                 <CardContent className="space-y-4">
                   <Button 
                     className="w-full bg-orange-500 hover:bg-orange-600" 
-                    onClick={() => navigate('/subscribe')}
+                    onClick={() => navigate('/payment')}
                   >
                     <CreditCard className="mr-2 h-4 w-4" />
                     Subscribe to CFC
