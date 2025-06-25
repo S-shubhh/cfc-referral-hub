@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -52,7 +51,6 @@ const Dashboard = () => {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [referrals, setReferrals] = useState<ReferralData[]>([]);
   const [loadingData, setLoadingData] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -69,9 +67,10 @@ const Dashboard = () => {
   const fetchUserData = async () => {
     if (!user) return;
     
+    setLoadingData(true);
+    
     try {
       console.log('Fetching user data for:', user.id);
-      setError(null);
       
       const { data, error } = await supabase
         .from('users')
@@ -81,48 +80,27 @@ const Dashboard = () => {
 
       if (error) {
         console.error('Supabase error:', error);
-        // If user record doesn't exist, show empty state instead of error
-        setUserData({
-          id: user.id,
-          name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
-          email: user.email || '',
-          mobile: user.user_metadata?.phone || '',
-          balance: 0,
-          referral_code: 'CFC' + Math.random().toString(36).substring(2, 8).toUpperCase(),
-          kyc_status: 'pending',
-          can_withdraw: false,
-          referral_bonus: 0
-        });
-        setReferrals([]);
-        setLoadingData(false);
-        return;
       }
 
-      if (!data) {
-        // Show empty state with default user data
-        setUserData({
-          id: user.id,
-          name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
-          email: user.email || '',
-          mobile: user.user_metadata?.phone || '',
-          balance: 0,
-          referral_code: 'CFC' + Math.random().toString(36).substring(2, 8).toUpperCase(),
-          kyc_status: 'pending',
-          can_withdraw: false,
-          referral_bonus: 0
-        });
-        setReferrals([]);
-        setLoadingData(false);
-        return;
-      }
+      // Always set user data - either from database or defaults
+      const defaultUserData: UserData = {
+        id: user.id,
+        name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+        email: user.email || '',
+        mobile: user.user_metadata?.phone || '',
+        balance: 0,
+        referral_code: 'CFC' + Math.random().toString(36).substring(2, 8).toUpperCase(),
+        kyc_status: 'pending',
+        can_withdraw: false,
+        referral_bonus: 0
+      };
 
-      console.log('User data fetched successfully:', data);
-      setUserData(data);
+      setUserData(data || defaultUserData);
       await fetchReferrals();
       
     } catch (error: any) {
       console.error('Error fetching user data:', error);
-      // Show empty state instead of error
+      // Set default user data on error
       setUserData({
         id: user.id,
         name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
@@ -183,7 +161,7 @@ const Dashboard = () => {
     }
   };
 
-  if (authLoading || loadingData) {
+  if (authLoading) {
     return (
       <div className="min-h-screen">
         <Header />
@@ -198,32 +176,29 @@ const Dashboard = () => {
     );
   }
 
-  if (!userData) {
-    return (
-      <div className="min-h-screen">
-        <Header />
-        <div className="container mx-auto px-4 py-20">
-          <div className="text-center">
-            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <h1 className="text-2xl font-bold mb-4">Unable to Load Dashboard</h1>
-            <p className="text-gray-600 mb-6">Something went wrong</p>
-            <Button onClick={() => navigate('/auth')} variant="outline">
-              Back to Login
-            </Button>
-          </div>
-        </div>
-        <Footer />
-      </div>
-    );
-  }
+  // Show dashboard even if userData is loading or missing
+  const displayUserData = userData || {
+    id: user?.id || '',
+    name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User',
+    email: user?.email || '',
+    mobile: user?.user_metadata?.phone || '',
+    balance: 0,
+    referral_code: 'CFC' + Math.random().toString(36).substring(2, 8).toUpperCase(),
+    kyc_status: 'pending',
+    can_withdraw: false,
+    referral_bonus: 0
+  };
 
   return (
     <div className="min-h-screen">
       <Header />
       <main className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Welcome back, {userData.name}!</h1>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Welcome back, {displayUserData.name}!</h1>
           <p className="text-gray-600">Manage your CFC account and earnings</p>
+          {loadingData && (
+            <p className="text-sm text-orange-600 mt-2">Loading your data...</p>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -233,7 +208,7 @@ const Dashboard = () => {
               <IndianRupee className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">₹{userData.balance.toFixed(2)}</div>
+              <div className="text-2xl font-bold">₹{displayUserData.balance.toFixed(2)}</div>
             </CardContent>
           </Card>
 
@@ -243,7 +218,7 @@ const Dashboard = () => {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">₹{userData.referral_bonus.toFixed(2)}</div>
+              <div className="text-2xl font-bold">₹{displayUserData.referral_bonus.toFixed(2)}</div>
             </CardContent>
           </Card>
 
@@ -263,8 +238,8 @@ const Dashboard = () => {
               <FileText className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <Badge variant={userData.kyc_status === 'verified' ? 'default' : 'secondary'}>
-                {userData.kyc_status}
+              <Badge variant={displayUserData.kyc_status === 'verified' ? 'default' : 'secondary'}>
+                {displayUserData.kyc_status}
               </Badge>
             </CardContent>
           </Card>
@@ -295,12 +270,12 @@ const Dashboard = () => {
                   <Button 
                     className="w-full" 
                     onClick={() => navigate('/wallet')}
-                    disabled={!userData.can_withdraw}
+                    disabled={!displayUserData.can_withdraw}
                   >
                     <Wallet className="mr-2 h-4 w-4" />
                     Withdraw Earnings
                   </Button>
-                  {!userData.can_withdraw && (
+                  {!displayUserData.can_withdraw && (
                     <p className="text-sm text-gray-600">
                       You need at least 3 referrals to withdraw earnings
                     </p>
@@ -316,7 +291,7 @@ const Dashboard = () => {
                 <CardContent className="space-y-4">
                   <div className="flex items-center space-x-2">
                     <code className="flex-1 p-2 bg-gray-100 rounded text-lg font-mono">
-                      {userData.referral_code}
+                      {displayUserData.referral_code}
                     </code>
                     <Button size="sm" onClick={copyReferralCode}>
                       <Copy className="h-4 w-4" />
@@ -384,17 +359,17 @@ const Dashboard = () => {
               <CardContent>
                 <div className="space-y-6">
                   <div className="flex items-center space-x-2">
-                    {userData.kyc_status === 'verified' ? (
+                    {displayUserData.kyc_status === 'verified' ? (
                       <CheckCircle className="h-5 w-5 text-green-500" />
                     ) : (
                       <AlertCircle className="h-5 w-5 text-yellow-500" />
                     )}
                     <span className="font-medium">
-                      Status: {userData.kyc_status}
+                      Status: {displayUserData.kyc_status}
                     </span>
                   </div>
 
-                  {userData.kyc_status !== 'verified' && (
+                  {displayUserData.kyc_status !== 'verified' && (
                     <div className="space-y-4">
                       <div>
                         <h4 className="font-medium mb-2">Required Documents:</h4>
@@ -423,19 +398,19 @@ const Dashboard = () => {
               <CardContent className="space-y-4">
                 <div>
                   <label className="text-sm font-medium">Name</label>
-                  <p className="text-gray-600">{userData.name}</p>
+                  <p className="text-gray-600">{displayUserData.name}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium">Email</label>
-                  <p className="text-gray-600">{userData.email}</p>
+                  <p className="text-gray-600">{displayUserData.email}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium">Mobile</label>
-                  <p className="text-gray-600">{userData.mobile || 'Not provided'}</p>
+                  <p className="text-gray-600">{displayUserData.mobile || 'Not provided'}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium">Referral Code</label>
-                  <p className="text-gray-600 font-mono">{userData.referral_code}</p>
+                  <p className="text-gray-600 font-mono">{displayUserData.referral_code}</p>
                 </div>
               </CardContent>
             </Card>

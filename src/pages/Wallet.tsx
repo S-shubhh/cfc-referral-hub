@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -81,6 +80,8 @@ const Wallet = () => {
   const fetchWalletData = async () => {
     if (!user) return;
     
+    setLoadingData(true);
+    
     try {
       console.log('Fetching wallet data for:', user.id);
       
@@ -91,17 +92,16 @@ const Wallet = () => {
         .eq('id', user.id)
         .maybeSingle();
 
-      if (userError || !userRes) {
+      if (userError) {
         console.error('User data error:', userError);
-        // Show empty state with default values
-        setUserData({
-          id: user.id,
-          balance: 0,
-          can_withdraw: false
-        });
-      } else {
-        setUserData(userRes);
       }
+
+      // Always set user data - either from database or defaults
+      setUserData(userRes || {
+        id: user.id,
+        balance: 0,
+        can_withdraw: false
+      });
 
       // Fetch transactions
       const { data: transactionsRes, error: transError } = await supabase
@@ -112,10 +112,8 @@ const Wallet = () => {
 
       if (transError) {
         console.error('Transactions error:', transError);
-        setTransactions([]);
-      } else {
-        setTransactions(transactionsRes || []);
       }
+      setTransactions(transactionsRes || []);
 
       // Fetch withdrawals
       const { data: withdrawalsRes, error: withdrawError } = await supabase
@@ -126,14 +124,12 @@ const Wallet = () => {
 
       if (withdrawError) {
         console.error('Withdrawals error:', withdrawError);
-        setWithdrawals([]);
-      } else {
-        setWithdrawals(withdrawalsRes || []);
       }
+      setWithdrawals(withdrawalsRes || []);
 
     } catch (error: any) {
       console.error('Error fetching wallet data:', error);
-      // Show empty state
+      // Set default data on error
       setUserData({
         id: user.id,
         balance: 0,
@@ -231,7 +227,7 @@ const Wallet = () => {
     }
   };
 
-  if (authLoading || loadingData) {
+  if (authLoading) {
     return (
       <div className="min-h-screen">
         <Header />
@@ -246,24 +242,12 @@ const Wallet = () => {
     );
   }
 
-  if (!userData) {
-    return (
-      <div className="min-h-screen">
-        <Header />
-        <div className="container mx-auto px-4 py-20">
-          <div className="text-center">
-            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <h1 className="text-2xl font-bold mb-4">Unable to Load Wallet</h1>
-            <p className="text-gray-600 mb-6">Something went wrong</p>
-            <Button onClick={() => navigate('/dashboard')} variant="outline">
-              Go to Dashboard
-            </Button>
-          </div>
-        </div>
-        <Footer />
-      </div>
-    );
-  }
+  // Show wallet even if userData is loading or missing
+  const displayUserData = userData || {
+    id: user?.id || '',
+    balance: 0,
+    can_withdraw: false
+  };
 
   return (
     <div className="min-h-screen">
@@ -272,6 +256,9 @@ const Wallet = () => {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">My Wallet</h1>
           <p className="text-gray-600">Manage your earnings and withdrawals</p>
+          {loadingData && (
+            <p className="text-sm text-orange-600 mt-2">Loading your wallet data...</p>
+          )}
         </div>
 
         {/* Balance Card */}
@@ -284,18 +271,18 @@ const Wallet = () => {
           </CardHeader>
           <CardContent>
             <div className="text-4xl font-bold text-green-600 mb-4">
-              ₹{userData.balance.toFixed(2)}
+              ₹{displayUserData.balance.toFixed(2)}
             </div>
             <div className="flex space-x-4">
               <Button 
                 onClick={() => setShowWithdrawForm(true)}
-                disabled={!userData.can_withdraw || userData.balance <= 0}
+                disabled={!displayUserData.can_withdraw || displayUserData.balance <= 0}
                 className="bg-orange-500 hover:bg-orange-600"
               >
                 <ArrowDownLeft className="mr-2 h-4 w-4" />
                 Withdraw Money
               </Button>
-              {!userData.can_withdraw && (
+              {!displayUserData.can_withdraw && (
                 <p className="text-sm text-gray-600 flex items-center">
                   You need at least 3 referrals to withdraw earnings
                 </p>
@@ -321,12 +308,12 @@ const Wallet = () => {
                     placeholder="Enter amount"
                     value={withdrawAmount}
                     onChange={(e) => setWithdrawAmount(e.target.value)}
-                    max={userData.balance}
+                    max={displayUserData.balance}
                     min="1"
                     required
                   />
                   <p className="text-sm text-gray-600 mt-1">
-                    Maximum: ₹{userData.balance.toFixed(2)}
+                    Maximum: ₹{displayUserData.balance.toFixed(2)}
                   </p>
                 </div>
 
