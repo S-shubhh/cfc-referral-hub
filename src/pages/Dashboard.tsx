@@ -1,27 +1,17 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { 
-  User, 
-  Wallet, 
-  Users, 
-  FileText, 
-  Copy, 
-  CheckCircle, 
-  AlertCircle,
-  Upload,
-  IndianRupee,
-  CreditCard,
-  RefreshCw
-} from 'lucide-react';
+import DashboardStats from '@/components/dashboard/DashboardStats';
+import QuickActions from '@/components/dashboard/QuickActions';
+import ReferralCode from '@/components/dashboard/ReferralCode';
+import ReferralsList from '@/components/dashboard/ReferralsList';
+import KYCVerification from '@/components/dashboard/KYCVerification';
+import ProfileInfo from '@/components/dashboard/ProfileInfo';
 
 interface UserData {
   id: string;
@@ -46,7 +36,6 @@ interface ReferralData {
 const Dashboard = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
   
   const [userData, setUserData] = useState<UserData | null>(null);
   const [referrals, setReferrals] = useState<ReferralData[]>([]);
@@ -140,27 +129,6 @@ const Dashboard = () => {
     }
   };
 
-  const copyReferralCode = () => {
-    if (userData?.referral_code) {
-      navigator.clipboard.writeText(userData.referral_code);
-      toast({
-        title: "Copied!",
-        description: "Referral code copied to clipboard",
-      });
-    }
-  };
-
-  const copyReferralLink = () => {
-    if (userData?.referral_code) {
-      const referralLink = `${window.location.origin}/auth?mode=signup&ref=${userData.referral_code}`;
-      navigator.clipboard.writeText(referralLink);
-      toast({
-        title: "Copied!",
-        description: "Referral link copied to clipboard",
-      });
-    }
-  };
-
   if (authLoading) {
     return (
       <div className="min-h-screen">
@@ -201,49 +169,10 @@ const Dashboard = () => {
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Balance</CardTitle>
-              <IndianRupee className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">₹{displayUserData.balance.toFixed(2)}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Referral Bonus</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">₹{displayUserData.referral_bonus.toFixed(2)}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Referrals</CardTitle>
-              <User className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{referrals.length}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">KYC Status</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <Badge variant={displayUserData.kyc_status === 'verified' ? 'default' : 'secondary'}>
-                {displayUserData.kyc_status}
-              </Badge>
-            </CardContent>
-          </Card>
-        </div>
+        <DashboardStats 
+          userData={displayUserData} 
+          referralsCount={referrals.length} 
+        />
 
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList>
@@ -255,165 +184,21 @@ const Dashboard = () => {
 
           <TabsContent value="overview">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Quick Actions</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Button 
-                    className="w-full bg-orange-500 hover:bg-orange-600" 
-                    onClick={() => navigate('/payment')}
-                  >
-                    <CreditCard className="mr-2 h-4 w-4" />
-                    Subscribe to CFC
-                  </Button>
-                  <Button 
-                    className="w-full" 
-                    onClick={() => navigate('/wallet')}
-                    disabled={!displayUserData.can_withdraw}
-                  >
-                    <Wallet className="mr-2 h-4 w-4" />
-                    Withdraw Earnings
-                  </Button>
-                  {!displayUserData.can_withdraw && (
-                    <p className="text-sm text-gray-600">
-                      You need at least 3 referrals to withdraw earnings
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Your Referral Code</CardTitle>
-                  <CardDescription>Share this code to earn referral bonuses</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center space-x-2">
-                    <code className="flex-1 p-2 bg-gray-100 rounded text-lg font-mono">
-                      {displayUserData.referral_code}
-                    </code>
-                    <Button size="sm" onClick={copyReferralCode}>
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <Button 
-                    onClick={copyReferralLink}
-                    variant="outline"
-                    className="w-full"
-                  >
-                    Copy Referral Link
-                  </Button>
-                </CardContent>
-              </Card>
+              <QuickActions canWithdraw={displayUserData.can_withdraw} />
+              <ReferralCode referralCode={displayUserData.referral_code} />
             </div>
           </TabsContent>
 
           <TabsContent value="referrals">
-            <Card>
-              <CardHeader>
-                <CardTitle>Your Referrals</CardTitle>
-                <CardDescription>
-                  You earn ₹300 for each direct referral and ₹100 for indirect referrals
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {referrals.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-600 text-lg mb-2">No referrals yet</p>
-                    <p className="text-gray-500">Start sharing your referral code to earn bonuses!</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {referrals.map((referral) => (
-                      <div key={referral.id} className="flex items-center justify-between p-4 border rounded">
-                        <div>
-                          <p className="font-medium">Referral #{referral.id.slice(0, 8)}</p>
-                          <p className="text-sm text-gray-600">
-                            {new Date(referral.created_at).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-bold text-green-600">+₹{referral.bonus_amount}</p>
-                          <Badge variant={referral.status === 'completed' ? 'default' : 'secondary'}>
-                            {referral.status}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <ReferralsList referrals={referrals} />
           </TabsContent>
 
           <TabsContent value="kyc">
-            <Card>
-              <CardHeader>
-                <CardTitle>KYC Verification</CardTitle>
-                <CardDescription>
-                  Complete your KYC to unlock all features
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div className="flex items-center space-x-2">
-                    {displayUserData.kyc_status === 'verified' ? (
-                      <CheckCircle className="h-5 w-5 text-green-500" />
-                    ) : (
-                      <AlertCircle className="h-5 w-5 text-yellow-500" />
-                    )}
-                    <span className="font-medium">
-                      Status: {displayUserData.kyc_status}
-                    </span>
-                  </div>
-
-                  {displayUserData.kyc_status !== 'verified' && (
-                    <div className="space-y-4">
-                      <div>
-                        <h4 className="font-medium mb-2">Required Documents:</h4>
-                        <ul className="space-y-2 text-sm text-gray-600">
-                          <li>• Aadhaar Card (Front & Back)</li>
-                          <li>• PAN Card</li>
-                        </ul>
-                      </div>
-
-                      <Button>
-                        <Upload className="mr-2 h-4 w-4" />
-                        Upload Documents
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+            <KYCVerification kycStatus={displayUserData.kyc_status} />
           </TabsContent>
 
           <TabsContent value="profile">
-            <Card>
-              <CardHeader>
-                <CardTitle>Profile Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium">Name</label>
-                  <p className="text-gray-600">{displayUserData.name}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Email</label>
-                  <p className="text-gray-600">{displayUserData.email}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Mobile</label>
-                  <p className="text-gray-600">{displayUserData.mobile || 'Not provided'}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Referral Code</label>
-                  <p className="text-gray-600 font-mono">{displayUserData.referral_code}</p>
-                </div>
-              </CardContent>
-            </Card>
+            <ProfileInfo userData={displayUserData} />
           </TabsContent>
         </Tabs>
       </main>
