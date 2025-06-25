@@ -14,6 +14,14 @@ const Header = () => {
     navigate('/');
   };
 
+  const handleSubscribeClick = () => {
+    if (user) {
+      navigate('/payment');
+    } else {
+      navigate('/auth?mode=signup');
+    }
+  };
+
   return (
     <header className="bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg">
       <div className="container mx-auto px-4 py-4">
@@ -32,7 +40,12 @@ const Header = () => {
             <Link to="/about" className="hover:text-orange-200 transition-colors">About</Link>
             <Link to="/how-it-works" className="hover:text-orange-200 transition-colors">How It Works</Link>
             {!user && (
-              <Link to="/subscribe" className="hover:text-orange-200 transition-colors">Subscribe</Link>
+              <button 
+                onClick={handleSubscribeClick}
+                className="hover:text-orange-200 transition-colors"
+              >
+                Subscribe
+              </button>
             )}
           </nav>
 
@@ -63,12 +76,14 @@ const Header = () => {
                     Login
                   </Button>
                 </Link>
-                <Link to="/auth?mode=signup">
-                  <Button size="sm" className="bg-white text-orange-500 hover:bg-gray-100">
-                    <UserPlus className="w-4 h-4 mr-2" />
-                    Join Now
-                  </Button>
-                </Link>
+                <Button 
+                  onClick={handleSubscribeClick}
+                  size="sm" 
+                  className="bg-white text-orange-500 hover:bg-gray-100"
+                >
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Join Now
+                </Button>
               </>
             )}
           </div>

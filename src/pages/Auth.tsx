@@ -71,7 +71,7 @@ const Auth = () => {
 
         toast({
           title: "Account created!",
-          description: "Welcome to CFC! You can now explore your dashboard.",
+          description: "Welcome to CFC! Check your email for verification if required.",
         });
       }
     } catch (error: any) {

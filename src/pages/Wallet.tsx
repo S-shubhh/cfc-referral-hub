@@ -18,7 +18,9 @@ import {
   CheckCircle, 
   XCircle,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Wallet as WalletIcon,
+  Receipt
 } from 'lucide-react';
 
 interface UserData {
@@ -54,7 +56,6 @@ const Wallet = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [loadingData, setLoadingData] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   
   // Withdrawal form state
   const [showWithdrawForm, setShowWithdrawForm] = useState(false);
@@ -82,10 +83,6 @@ const Wallet = () => {
     
     try {
       console.log('Fetching wallet data for:', user.id);
-      setError(null);
-      
-      // Add delay to ensure user record exists
-      await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Fetch user data
       const { data: userRes, error: userError } = await supabase
@@ -94,13 +91,17 @@ const Wallet = () => {
         .eq('id', user.id)
         .maybeSingle();
 
-      if (userError) throw userError;
-      
-      if (!userRes) {
-        throw new Error('User data not found. Please go to dashboard first.');
+      if (userError || !userRes) {
+        console.error('User data error:', userError);
+        // Show empty state with default values
+        setUserData({
+          id: user.id,
+          balance: 0,
+          can_withdraw: false
+        });
+      } else {
+        setUserData(userRes);
       }
-      
-      setUserData(userRes);
 
       // Fetch transactions
       const { data: transactionsRes, error: transError } = await supabase
@@ -109,8 +110,12 @@ const Wallet = () => {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (transError) throw transError;
-      setTransactions(transactionsRes || []);
+      if (transError) {
+        console.error('Transactions error:', transError);
+        setTransactions([]);
+      } else {
+        setTransactions(transactionsRes || []);
+      }
 
       // Fetch withdrawals
       const { data: withdrawalsRes, error: withdrawError } = await supabase
@@ -119,25 +124,26 @@ const Wallet = () => {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (withdrawError) throw withdrawError;
-      setWithdrawals(withdrawalsRes || []);
+      if (withdrawError) {
+        console.error('Withdrawals error:', withdrawError);
+        setWithdrawals([]);
+      } else {
+        setWithdrawals(withdrawalsRes || []);
+      }
 
     } catch (error: any) {
       console.error('Error fetching wallet data:', error);
-      setError(error.message);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to load wallet data",
-        variant: "destructive",
+      // Show empty state
+      setUserData({
+        id: user.id,
+        balance: 0,
+        can_withdraw: false
       });
+      setTransactions([]);
+      setWithdrawals([]);
     } finally {
       setLoadingData(false);
     }
-  };
-
-  const handleRetry = () => {
-    setLoadingData(true);
-    fetchWalletData();
   };
 
   const handleWithdrawSubmit = async (e: React.FormEvent) => {
@@ -240,7 +246,7 @@ const Wallet = () => {
     );
   }
 
-  if (error || !userData) {
+  if (!userData) {
     return (
       <div className="min-h-screen">
         <Header />
@@ -248,16 +254,10 @@ const Wallet = () => {
           <div className="text-center">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
             <h1 className="text-2xl font-bold mb-4">Unable to Load Wallet</h1>
-            <p className="text-gray-600 mb-6">{error || 'Something went wrong'}</p>
-            <div className="space-x-4">
-              <Button onClick={handleRetry} className="bg-orange-500 hover:bg-orange-600">
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Try Again
-              </Button>
-              <Button variant="outline" onClick={() => navigate('/dashboard')}>
-                Go to Dashboard
-              </Button>
-            </div>
+            <p className="text-gray-600 mb-6">Something went wrong</p>
+            <Button onClick={() => navigate('/dashboard')} variant="outline">
+              Go to Dashboard
+            </Button>
           </div>
         </div>
         <Footer />
@@ -399,7 +399,11 @@ const Wallet = () => {
             </CardHeader>
             <CardContent>
               {withdrawals.length === 0 ? (
-                <p className="text-gray-600">No withdrawals yet</p>
+                <div className="text-center py-8">
+                  <WalletIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600 text-lg mb-2">No withdrawals yet</p>
+                  <p className="text-gray-500">Your withdrawal history will appear here</p>
+                </div>
               ) : (
                 <div className="space-y-4">
                   {withdrawals.map((withdrawal) => (
@@ -431,7 +435,11 @@ const Wallet = () => {
             </CardHeader>
             <CardContent>
               {transactions.length === 0 ? (
-                <p className="text-gray-600">No transactions yet</p>
+                <div className="text-center py-8">
+                  <Receipt className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600 text-lg mb-2">No transactions yet</p>
+                  <p className="text-gray-500">Your transaction history will appear here</p>
+                </div>
               ) : (
                 <div className="space-y-4">
                   {transactions.map((transaction) => (

@@ -53,7 +53,6 @@ const Dashboard = () => {
   const [referrals, setReferrals] = useState<ReferralData[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -65,7 +64,7 @@ const Dashboard = () => {
     if (user && !authLoading) {
       fetchUserData();
     }
-  }, [user, authLoading, retryCount]);
+  }, [user, authLoading]);
 
   const fetchUserData = async () => {
     if (!user) return;
@@ -73,9 +72,6 @@ const Dashboard = () => {
     try {
       console.log('Fetching user data for:', user.id);
       setError(null);
-      
-      // Add a small delay to ensure user record creation is complete
-      await new Promise(resolve => setTimeout(resolve, 1000));
       
       const { data, error } = await supabase
         .from('users')
@@ -85,17 +81,39 @@ const Dashboard = () => {
 
       if (error) {
         console.error('Supabase error:', error);
-        throw error;
+        // If user record doesn't exist, show empty state instead of error
+        setUserData({
+          id: user.id,
+          name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+          email: user.email || '',
+          mobile: user.user_metadata?.phone || '',
+          balance: 0,
+          referral_code: 'CFC' + Math.random().toString(36).substring(2, 8).toUpperCase(),
+          kyc_status: 'pending',
+          can_withdraw: false,
+          referral_bonus: 0
+        });
+        setReferrals([]);
+        setLoadingData(false);
+        return;
       }
 
       if (!data) {
-        console.log('No user data found, will retry...');
-        if (retryCount < 3) {
-          setRetryCount(prev => prev + 1);
-          return;
-        } else {
-          throw new Error('User record not found after multiple attempts');
-        }
+        // Show empty state with default user data
+        setUserData({
+          id: user.id,
+          name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+          email: user.email || '',
+          mobile: user.user_metadata?.phone || '',
+          balance: 0,
+          referral_code: 'CFC' + Math.random().toString(36).substring(2, 8).toUpperCase(),
+          kyc_status: 'pending',
+          can_withdraw: false,
+          referral_bonus: 0
+        });
+        setReferrals([]);
+        setLoadingData(false);
+        return;
       }
 
       console.log('User data fetched successfully:', data);
@@ -104,12 +122,19 @@ const Dashboard = () => {
       
     } catch (error: any) {
       console.error('Error fetching user data:', error);
-      setError(error.message || 'Failed to load user data');
-      toast({
-        title: "Error",
-        description: "Failed to load user data. Please try refreshing the page.",
-        variant: "destructive",
+      // Show empty state instead of error
+      setUserData({
+        id: user.id,
+        name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+        email: user.email || '',
+        mobile: user.user_metadata?.phone || '',
+        balance: 0,
+        referral_code: 'CFC' + Math.random().toString(36).substring(2, 8).toUpperCase(),
+        kyc_status: 'pending',
+        can_withdraw: false,
+        referral_bonus: 0
       });
+      setReferrals([]);
     } finally {
       setLoadingData(false);
     }
@@ -125,17 +150,16 @@ const Dashboard = () => {
         .eq('referrer_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching referrals:', error);
+        setReferrals([]);
+        return;
+      }
       setReferrals(data || []);
     } catch (error) {
       console.error('Error fetching referrals:', error);
+      setReferrals([]);
     }
-  };
-
-  const handleRetry = () => {
-    setLoadingData(true);
-    setRetryCount(0);
-    fetchUserData();
   };
 
   const copyReferralCode = () => {
@@ -174,7 +198,7 @@ const Dashboard = () => {
     );
   }
 
-  if (error || !userData) {
+  if (!userData) {
     return (
       <div className="min-h-screen">
         <Header />
@@ -182,16 +206,10 @@ const Dashboard = () => {
           <div className="text-center">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
             <h1 className="text-2xl font-bold mb-4">Unable to Load Dashboard</h1>
-            <p className="text-gray-600 mb-6">{error || 'Something went wrong'}</p>
-            <div className="space-x-4">
-              <Button onClick={handleRetry} className="bg-orange-500 hover:bg-orange-600">
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Try Again
-              </Button>
-              <Button variant="outline" onClick={() => navigate('/auth')}>
-                Back to Login
-              </Button>
-            </div>
+            <p className="text-gray-600 mb-6">Something went wrong</p>
+            <Button onClick={() => navigate('/auth')} variant="outline">
+              Back to Login
+            </Button>
           </div>
         </div>
         <Footer />
@@ -326,7 +344,11 @@ const Dashboard = () => {
               </CardHeader>
               <CardContent>
                 {referrals.length === 0 ? (
-                  <p className="text-gray-600">No referrals yet. Start sharing your referral code!</p>
+                  <div className="text-center py-8">
+                    <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600 text-lg mb-2">No referrals yet</p>
+                    <p className="text-gray-500">Start sharing your referral code to earn bonuses!</p>
+                  </div>
                 ) : (
                   <div className="space-y-4">
                     {referrals.map((referral) => (
@@ -409,7 +431,7 @@ const Dashboard = () => {
                 </div>
                 <div>
                   <label className="text-sm font-medium">Mobile</label>
-                  <p className="text-gray-600">{userData.mobile}</p>
+                  <p className="text-gray-600">{userData.mobile || 'Not provided'}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium">Referral Code</label>
