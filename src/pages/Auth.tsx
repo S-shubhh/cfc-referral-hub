@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
-import { Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 
 const Auth = () => {
   const { user, signIn, signUp, loading } = useAuth();
@@ -30,15 +30,10 @@ const Auth = () => {
 
   useEffect(() => {
     if (!loading && user) {
-      // If user is logged in and came from signup, redirect to payment
-      if (searchParams.get('mode') === 'signup') {
-        const paymentUrl = referralCode ? `/payment?ref=${referralCode}` : '/payment';
-        navigate(paymentUrl);
-      } else {
-        navigate('/dashboard');
-      }
+      // Always redirect to dashboard after successful auth
+      navigate('/dashboard');
     }
-  }, [user, loading, navigate, searchParams, referralCode]);
+  }, [user, loading, navigate]);
 
   useEffect(() => {
     setIsLogin(searchParams.get('mode') !== 'signup');
@@ -76,7 +71,7 @@ const Auth = () => {
 
         toast({
           title: "Account created!",
-          description: "Please check your email to verify your account.",
+          description: "Welcome to CFC! You can now explore your dashboard.",
         });
       }
     } catch (error: any) {
@@ -115,7 +110,7 @@ const Auth = () => {
               <CardDescription>
                 {isLogin 
                   ? 'Sign in to your account to continue' 
-                  : 'Create your account to start earning and enjoying unlimited food'
+                  : 'Create your account to get started with CFC'
                 }
               </CardDescription>
               {referralCode && !isLogin && (
@@ -220,9 +215,8 @@ const Auth = () => {
                     ? 'Please wait...' 
                     : isLogin 
                       ? 'Sign In' 
-                      : 'Create Account & Continue to Payment'
+                      : 'Create Account'
                   }
-                  {!isLogin && <ArrowRight className="ml-2 h-4 w-4" />}
                 </Button>
               </form>
               
@@ -249,14 +243,6 @@ const Auth = () => {
                   </p>
                 )}
               </div>
-              
-              {!isLogin && (
-                <div className="mt-4 p-3 bg-orange-50 rounded-lg">
-                  <p className="text-orange-700 text-xs text-center">
-                    After creating your account, you'll be taken to secure payment to complete your CFC membership for just ₹1000.
-                  </p>
-                </div>
-              )}
             </CardContent>
           </Card>
         </div>

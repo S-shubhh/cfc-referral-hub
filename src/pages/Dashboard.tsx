@@ -18,7 +18,8 @@ import {
   CheckCircle, 
   AlertCircle,
   Upload,
-  IndianRupee
+  IndianRupee,
+  CreditCard
 } from 'lucide-react';
 
 interface UserData {
@@ -79,9 +80,8 @@ const Dashboard = () => {
       }
 
       if (!data) {
-        console.log('No user data found, creating user record...');
-        // Create user record if it doesn't exist
-        await createUserRecord();
+        console.log('No user data found');
+        // User record will be created by AuthContext
         return;
       }
 
@@ -96,50 +96,6 @@ const Dashboard = () => {
       });
     } finally {
       setLoadingData(false);
-    }
-  };
-
-  const createUserRecord = async () => {
-    try {
-      if (!user) return;
-      
-      const referralCode = 'CFC' + Math.random().toString(36).substring(2, 8).toUpperCase();
-      
-      const { data, error } = await supabase
-        .from('users')
-        .insert({
-          id: user.id,
-          name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
-          email: user.email || '',
-          mobile: user.user_metadata?.phone || '',
-          password_hash: '',
-          aadhaar_number: '',
-          pan_number: '',
-          aadhaar_image_path: '',
-          pan_image_path: '',
-          referral_code: referralCode,
-          balance: 0,
-          referral_bonus: 0,
-          can_withdraw: false,
-          kyc_status: 'pending'
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      
-      setUserData(data);
-      toast({
-        title: "Welcome!",
-        description: "Your account has been set up successfully.",
-      });
-    } catch (error) {
-      console.error('Error creating user record:', error);
-      toast({
-        title: "Error",
-        description: "Failed to set up your account. Please contact support.",
-        variant: "destructive",
-      });
     }
   };
 
@@ -164,6 +120,17 @@ const Dashboard = () => {
       toast({
         title: "Copied!",
         description: "Referral code copied to clipboard",
+      });
+    }
+  };
+
+  const copyReferralLink = () => {
+    if (userData?.referral_code) {
+      const referralLink = `${window.location.origin}/auth?mode=signup&ref=${userData.referral_code}`;
+      navigator.clipboard.writeText(referralLink);
+      toast({
+        title: "Copied!",
+        description: "Referral link copied to clipboard",
       });
     }
   };
@@ -264,6 +231,13 @@ const Dashboard = () => {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <Button 
+                    className="w-full bg-orange-500 hover:bg-orange-600" 
+                    onClick={() => navigate('/subscribe')}
+                  >
+                    <CreditCard className="mr-2 h-4 w-4" />
+                    Subscribe to CFC
+                  </Button>
+                  <Button 
                     className="w-full" 
                     onClick={() => navigate('/wallet')}
                     disabled={!userData.can_withdraw}
@@ -284,7 +258,7 @@ const Dashboard = () => {
                   <CardTitle>Your Referral Code</CardTitle>
                   <CardDescription>Share this code to earn referral bonuses</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
                   <div className="flex items-center space-x-2">
                     <code className="flex-1 p-2 bg-gray-100 rounded text-lg font-mono">
                       {userData.referral_code}
@@ -293,6 +267,13 @@ const Dashboard = () => {
                       <Copy className="h-4 w-4" />
                     </Button>
                   </div>
+                  <Button 
+                    onClick={copyReferralLink}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    Copy Referral Link
+                  </Button>
                 </CardContent>
               </Card>
             </div>
